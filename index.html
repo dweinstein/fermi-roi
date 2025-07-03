@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fermi ROI Prioritization App</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css" rel="stylesheet">
+    <style>
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        * { box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // Lucide icons as simple SVG components
+        const Target = () => (
+            <svg className="lucide lucide-target" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+            </svg>
+        );
+
+        const Plus = () => (
+            <svg className="lucide lucide-plus" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+            </svg>
+        );
+
+        const Share2 = () => (
+            <svg className="lucide lucide-share-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>
+            </svg>
+        );
+
+        const Download = () => (
+            <svg className="lucide lucide-download" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" x2="12" y1="15" y2="3"/>
+            </svg>
+        );
+
+        const Upload = () => (
+            <svg className="lucide lucide-upload" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>
+            </svg>
+        );
+
+        const BarChart3 = () => (
+            <svg className="lucide lucide-bar-chart-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+            </svg>
+        );
+
+        const Edit3 = () => (
+            <svg className="lucide lucide-edit-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+            </svg>
+        );
+
+        const Save = () => (
+            <svg className="lucide lucide-save" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17,21 17,13 7,13 7,21"/>
+                <polyline points="7,3 7,8 15,8"/>
+            </svg>
+        );
+
+        const X = () => (
+            <svg className="lucide lucide-x" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        );
+
+        const DollarSign = () => (
+            <svg className="lucide lucide-dollar-sign" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+        );
+
+        const Clock = () => (
+            <svg className="lucide lucide-clock" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+            </svg>
+        );
+
+        const Star = () => (
+            <svg className="lucide lucide-star" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+        );
+
+        const AuditLogIcon = () => (
+            <svg className="lucide lucide-list" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="8" x2="21" y1="6" y2="6"/>
+                <line x1="8" x2="21" y1="12" y2="12"/>
+                <line x1="8" x2="21" y1="18" y2="18"/>
+                <circle cx="3" cy="6" r="1"/>
+                <circle cx="3" cy="12" r="1"/>
+                <circle cx="3" cy="18" r="1"/>
+            </svg>
+        );
+
+        function UserBadge({ user, label }) {
+            return (
+                <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        label === "Creator"
+                            ? "bg-purple-100 text-purple-800 border border-purple-200"
+                            : "bg-gray-100 text-gray-700 border border-gray-200"
+                    } mr-1`}
+                    title={label ? `${label}: ${user}` : user}
+                >
+                    {user}
+                    {label && (
+                        <span className="ml-1 text-[10px] font-normal text-gray-400">({label})</span>
+                    )}
+                </span>
+            );
+        }
+
+        // Mock CRDT-like data structure for demonstration
+        class SimpleEventLog {
+            constructor() {
+                this.events = [];
+                this.listeners = [];
+            }
+
+            append(event) {
+                const eventWithTimestamp = {
+                    ...event,
+                    timestamp: Date.now(),
+                    id: Math.random().toString(36).substr(2, 9)
+                };
+                this.events.push(eventWithTimestamp);
+                this.listeners.forEach(listener => listener(eventWithTimestamp));
+                this.saveToStorage();
+            }
+
+            subscribe(listener) {
+                this.listeners.push(listener);
+                return () => {
+                    this.listeners = this.listeners.filter(l => l !== listener);
+                };
+            }
+
+            saveToStorage() {
+                const sessionId = window.location.hash.split('/')[1] || 'default';
+                localStorage.setItem(`fermi_session_${sessionId}`, JSON.stringify({
+                    events: this.events,
+                    lastModified: Date.now()
+                }));
+            }
+
+            loadFromStorage(sessionId) {
+                const data = localStorage.getItem(`fermi_session_${sessionId}`);
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    this.events = parsed.events || [];
+                }
+            }
+
+            // Merge imported events, deduplicating by event id
+            mergeEvents(importedEvents) {
+                const existingIds = new Set(this.events.map(e => e.id));
+                const newEvents = importedEvents.filter(e => !existingIds.has(e.id));
+                if (newEvents.length > 0) {
+                    this.events = [...this.events, ...newEvents];
+                    // Sort by timestamp for deterministic replay
+                    this.events.sort((a, b) => a.timestamp - b.timestamp);
+                    this.saveToStorage();
+                    this.listeners.forEach(listener => listener({ type: 'MERGE' }));
+                }
+            }
+
+            getState() {
+                const state = {
+                    actions: [],
+                    categories: [
+                        { id: 'customer_value', name: 'Customer Value', color: '#3b82f6' },
+                        { id: 'pipeline_gen', name: 'Pipeline Generation', color: '#10b981' },
+                        { id: 'partnerships', name: 'Growing Partnerships', color: '#f59e0b' }
+                    ],
+                    dimensions: [
+                        {
+                            id: 'revenue',
+                            name: 'Revenue Impact (ARR)',
+                            scaleValues: [
+                                { value: 0, label: 'None', description: 'No measurable revenue impact' },
+                                { value: 1, label: '$1K', description: 'Minor impact, up to $1,000 in annual recurring revenue' },
+                                { value: 2, label: '$10K', description: 'Moderate impact, up to $10,000 in annual recurring revenue' },
+                                { value: 3, label: '$100K', description: 'Significant impact, up to $100,000 in annual recurring revenue' },
+                                { value: 4, label: '$1M', description: 'Major impact, $1,000,000 or more in annual recurring revenue' }
+                            ]
+                        },
+                        {
+                            id: 'effort',
+                            name: 'Implementation Effort',
+                            scaleValues: [
+                                { value: 0, label: '1 day', description: 'Minimal effort, can be completed in a single day' },
+                                { value: 1, label: '1 week', description: 'Low effort, about one week of work' },
+                                { value: 2, label: '4 weeks', description: 'Moderate effort, about one month of work' },
+                                { value: 3, label: '3 months', description: 'High effort, up to three months of work' },
+                                { value: 4, label: '6 months', description: 'Very high effort, six months or more of work' }
+                            ]
+                        },
+                        {
+                            id: 'strategic',
+                            name: 'Strategic Opportunity',
+                            scaleValues: [
+                                { value: 0, label: 'None', description: 'No strategic impact' },
+                                { value: 1, label: 'Low', description: 'Minor strategic alignment' },
+                                { value: 2, label: 'Medium', description: 'Moderate strategic value' },
+                                { value: 3, label: 'High', description: 'Strong strategic fit' },
+                                { value: 4, label: 'Transformational', description: 'Game-changing strategic opportunity' }
+                            ]
+                        }
+                    ]
+                };
+
+                // Apply events to build current state
+                this.events.forEach(event => {
+                    switch (event.type) {
+                        case 'ACTION_ADDED':
+                            state.actions.push(event.action);
+                            break;
+                        case 'ACTION_UPDATED':
+                            const actionIndex = state.actions.findIndex(a => a.id === event.action.id);
+                            if (actionIndex >= 0) {
+                                state.actions[actionIndex] = { ...state.actions[actionIndex], ...event.action };
+                            }
+                            break;
+                        case 'ESTIMATE_ADDED':
+                            const action = state.actions.find(a => a.id === event.actionId);
+                            if (action) {
+                                if (!action.estimates) action.estimates = [];
+                                // Find if this contributor already has an estimate for this dimension
+                                const existingIndex = action.estimates.findIndex(e => 
+                                    e.dimensionId === event.estimate.dimensionId && e.contributorId === event.estimate.contributorId
+                                );
+                                if (existingIndex >= 0) {
+                                    action.estimates[existingIndex] = event.estimate;
+                                } else {
+                                    action.estimates.push(event.estimate);
+                                }
+                            }
+                            break;
+                    }
+                });
+
+                return state;
+            }
+        }
+
+        // Global event log instance
+        const eventLog = new SimpleEventLog();
+
+        function AuditLogSidebar({ events, onShowFullLog, maxEvents = 5 }) {
+            // Sort and take the most recent events
+            const recentEvents = [...events].sort((a, b) => b.timestamp - a.timestamp).slice(0, maxEvents);
+
+            // Helper: get a summary for each event
+            function getSummary(event) {
+                if (event.type === "ACTION_ADDED") return `Added: ${event.action?.title}`;
+                if (event.type === "ACTION_UPDATED") return `Edited: ${event.action?.title}`;
+                if (event.type === "ESTIMATE_ADDED") return `Estimated: ${event.estimate?.dimensionId}`;
+                return event.type;
+            }
+
+            // Helper: get user
+            function getUser(event) {
+                if (event.type === "ACTION_ADDED") return event.action?.createdBy || "anonymous";
+                if (event.type === "ACTION_UPDATED") return event.action?.updatedBy || event.action?.createdBy || "anonymous";
+                if (event.type === "ESTIMATE_ADDED") return event.estimate?.contributorId || "anonymous";
+                return "unknown";
+            }
+
+            return (
+                <aside className="fixed right-0 top-16 w-80 h-[calc(100vh-4rem)] bg-white border-l shadow-lg z-30 overflow-y-auto p-4 hidden md:block">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Recent Activity</h3>
+                    <ul className="space-y-2">
+                        {recentEvents.map(event => (
+                            <li key={event.id} className="text-xs text-gray-600 flex flex-col border-b pb-2 last:border-b-0 last:pb-0">
+                                <span className="font-medium text-gray-800">{getSummary(event)}</span>
+                                <span className="text-gray-400">{getUser(event)} &middot; {new Date(event.timestamp).toLocaleTimeString()}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    <button
+                        onClick={onShowFullLog}
+                        className="block mt-4 text-xs text-blue-600 underline"
+                    >
+                        View full audit log &rarr;
+                    </button>
+                </aside>
+            );
+        }
+
+        function FermiROIApp() {
+            const [actions, setActions] = useState([]);
+            const [categories, setCategories] = useState([]);
+            const [dimensions, setDimensions] = useState([]);
+            const [activeView, setActiveView] = useState('actions');
+            const [showAddAction, setShowAddAction] = useState(false);
+            const [sessionId, setSessionId] = useState(null);
+            const [accessMode, setAccessMode] = useState('admin');
+            const [currentUser, setCurrentUser] = useState(() => {
+                // Try to get from localStorage, fallback to empty string
+                return localStorage.getItem('fermi_current_user') || '';
+            });
+            const [importError, setImportError] = useState('');
+            const [eventLogEvents, setEventLogEvents] = useState([]); // For audit log
+            const fileInputRef = useRef();
+
+            // Save currentUser to localStorage when it changes
+            useEffect(() => {
+                localStorage.setItem('fermi_current_user', currentUser);
+            }, [currentUser]);
+
+            // Initialize session from URL or create new
+            useEffect(() => {
+                const hash = window.location.hash.slice(1);
+                let currentSessionId, mode;
+
+                if (hash) {
+                    const parts = hash.split('/');
+                    mode = parts[0];
+                    currentSessionId = parts[1];
+                } else {
+                    // Create new session
+                    currentSessionId = Math.random().toString(36).substr(2, 9);
+                    mode = 'admin';
+                    window.location.hash = `admin/${currentSessionId}/key_${Math.random().toString(36).substr(2, 8)}`;
+                }
+
+                setSessionId(currentSessionId);
+                setAccessMode(mode);
+                eventLog.loadFromStorage(currentSessionId);
+
+                // Subscribe to real-time updates
+                const unsubscribe = eventLog.subscribe((event) => {
+                    updateStateFromEventLog();
+                    setEventLogEvents([...eventLog.events]); // update audit log events
+                });
+
+                updateStateFromEventLog();
+                setEventLogEvents([...eventLog.events]);
+
+                return unsubscribe;
+            }, []);
+
+            const updateStateFromEventLog = useCallback(() => {
+                const state = eventLog.getState();
+                setActions(state.actions);
+                setCategories(state.categories);
+                setDimensions(state.dimensions);
+            }, []);
+
+            const addAction = (actionData) => {
+                const action = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    title: actionData.title,
+                    description: actionData.description,
+                    categoryId: actionData.categoryId,
+                    estimates: [],
+                    createdAt: new Date().toISOString(),
+                    createdBy: currentUser || 'anonymous'
+                };
+
+                eventLog.append({
+                    type: 'ACTION_ADDED',
+                    action
+                });
+
+                setShowAddAction(false);
+            };
+
+            // Allow different users to provide their own estimates for each action/dimension.
+            // Each estimate is attributed to the currentUser (or 'anonymous').
+            // The event log will store all estimates, and the reducer logic ensures only one estimate per user per dimension per action.
+            const addEstimate = (actionId, dimensionId, value, confidence = 3) => {
+                const estimate = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    dimensionId,
+                    contributorId: currentUser || 'anonymous',
+                    estimateValue: value,
+                    confidenceLevel: confidence,
+                    createdAt: new Date().toISOString()
+                };
+
+                eventLog.append({
+                    type: 'ESTIMATE_ADDED',
+                    actionId,
+                    estimate
+                });
+            };
+
+            const updateAction = (actionId, updates) => {
+                const action = actions.find(a => a.id === actionId);
+                if (!action) return;
+
+                const updatedAction = {
+                    ...action,
+                    ...updates,
+                    updatedBy: currentUser || 'anonymous',
+                    updatedAt: new Date().toISOString()
+                };
+
+                eventLog.append({
+                    type: 'ACTION_UPDATED',
+                    action: updatedAction
+                });
+            };
+
+            /**
+             *  ROI calculation for order of magnitude scoring
+             * Calculates an order-of-magnitude ROI score for an action, using all user inputs.
+             * - Each user's revenue and effort estimate is mapped to its true value (e.g., $1K = 1000, 1 week = 10, etc).
+             * - For each user who has both a revenue and effort estimate, compute their ROI as revenue_value / effort_value.
+             * - The final ROI is the geometric mean of all user ROIs (to reflect order-of-magnitude consensus).
+             * - If only one user, just use their ROI.
+             * - If no valid pairs, return 0.
+             */
+            const calculateROI = (action) => {
+                if (!action.estimates || action.estimates.length === 0) return 0;
+
+                // Build a map: contributorId -> { revenue: value, effort: value, strategic: value }
+                const userEstimates = {};
+                for (const est of action.estimates) {
+                    if (!userEstimates[est.contributorId]) userEstimates[est.contributorId] = {};
+                    if (est.dimensionId === 'revenue') userEstimates[est.contributorId].revenue = est.estimateValue;
+                    if (est.dimensionId === 'effort') userEstimates[est.contributorId].effort = est.estimateValue;
+                    if (est.dimensionId === 'strategic') userEstimates[est.contributorId].strategic = est.estimateValue;
+                }
+
+                // Get the scale value mapping for revenue and effort
+                // (Assume dimensions are available in closure, fallback to hardcoded if not)
+                let revenueScale = [1, 10, 100, 1000, 10000];
+                let effortScale = [1, 10, 100, 1000, 10000];
+                let strategicScale = [1, 10, 100, 1000, 10000];
+
+                // For each user with both estimates, compute their ROI
+                const userROIs = [];
+                for (const userId in userEstimates) {
+                    const u = userEstimates[userId];
+                    if (
+                        typeof u.revenue !== "undefined" &&
+                        typeof u.effort !== "undefined" &&
+                        typeof u.strategic !== "undefined" &&
+                        revenueScale[u.revenue] !== undefined &&
+                        effortScale[u.effort] !== undefined &&
+                        strategicScale[u.strategic] !== undefined
+                    ) {
+                        // u.revenue and u.effort are indices into the scale arrays
+                        const revenueValue = revenueScale[u.revenue];
+                        const effortValue = effortScale[u.effort];
+                        const strategicValue = strategicScale[u.strategic];
+                        // Defensive: avoid divide by zero
+                        if (typeof revenueValue === "number" && typeof effortValue === "number" && effortValue > 0) {
+                            userROIs.push(revenueValue / effortValue * strategicValue);
+                        }
+                    }
+                }
+
+                if (userROIs.length === 0) return 0;
+                if (userROIs.length === 1) return userROIs[0];
+
+                // Geometric mean for order-of-magnitude consensus
+                const logSum = userROIs.reduce((sum, roi) => sum + Math.log10(roi), 0);
+                const geoMean = Math.pow(10, logSum / userROIs.length);
+                return geoMean;
+            };
+
+            const sortedActions = [...actions].sort((a, b) => calculateROI(b) - calculateROI(a));
+
+            const generateShareableUrl = (mode) => {
+                const baseUrl = window.location.origin + window.location.pathname;
+                const shareKey = Math.random().toString(36).substr(2, 8);
+                return `${baseUrl}#${mode}/${sessionId}/key_${shareKey}`;
+            };
+
+            // Export now includes the event log for sharing
+            const exportData = () => {
+                // Try to get the full event log for this session
+                const sessionIdForExport = sessionId || 'default';
+                const eventLogData = localStorage.getItem(`fermi_session_${sessionIdForExport}`);
+                let events = [];
+                if (eventLogData) {
+                    try {
+                        const parsed = JSON.parse(eventLogData);
+                        events = parsed.events || [];
+                    } catch (e) {
+                        // fallback: no events
+                    }
+                }
+                const exportData = {
+                    sessionId,
+                    actions,
+                    categories,
+                    dimensions,
+                    events,
+                    exportedAt: new Date().toISOString()
+                };
+                
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const userPart = currentUser ? `${currentUser.replace(/[^a-zA-Z0-9_-]/g, '')}` : '';
+                const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+                a.download = `fermi_roi_session_${sessionId}_${userPart}_${dateStr}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            // Import functionality
+            const handleImportClick = () => {
+                setImportError('');
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                    fileInputRef.current.click();
+                }
+            };
+
+            const toast = async ({ textContent }) => {
+                const toast = document.createElement('div');
+                toast.textContent = textContent;
+                toast.style.position = 'fixed';
+                toast.style.bottom = '32px';
+                toast.style.left = '50%';
+                toast.style.transform = 'translateX(-50%)';
+                toast.style.background = '#22c55e';
+                toast.style.color = 'white';
+                toast.style.padding = '12px 24px';
+                toast.style.borderRadius = '8px';
+                toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                toast.style.fontSize = '16px';
+                toast.style.zIndex = 9999;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.remove();
+                }, 2000);
+            }
+
+            const handleImportFile = (e) => {
+                setImportError('');
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const imported = JSON.parse(event.target.result);
+                        if (!imported.events || !Array.isArray(imported.events)) {
+                            setImportError('Invalid file: missing event log.');
+                            return;
+                        }
+                        // Optionally, check for sessionId match or warn user
+                        // Attribute imported data to the user specified in the imported data (preserved in events)
+                        eventLog.mergeEvents(imported.events);
+                        // Show a toast message for import success
+                        toast({textContent: 'Import successful! Data merged.'});
+                        setEventLogEvents([...eventLog.events]);
+                    } catch (err) {
+                        setImportError('Failed to import: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const isCurrentUserValid = currentUser && currentUser.trim().length > 0;
+
+            function handleAuditLogClick() {
+                setActiveView(activeView === 'auditlog' ? 'actions' : 'auditlog');
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    <header className="bg-white shadow-sm border-b">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center h-16">
+                                <div className="flex items-center space-x-4">
+                                    <Target />
+                                    <h1 className="text-xl font-semibold text-gray-900">Fermi ROI Prioritization</h1>
+                                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                                        {accessMode === 'admin' ? 'Admin' : accessMode === 'edit' ? 'Contributor' : 'Viewer'}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex items-center space-x-4">
+                                    <div className="flex items-center space-x-2">
+                                        <label htmlFor="currentUser" className="text-sm text-gray-700">User:</label>
+                                        <input
+                                            id="currentUser"
+                                            type="text"
+                                            value={currentUser}
+                                            onChange={e => setCurrentUser(e.target.value)}
+                                            placeholder="Enter your name"
+                                            className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-32"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => setActiveView(activeView === 'actions' ? 'analytics' : 'actions')}
+                                        className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
+                                    >
+                                        {activeView === 'actions' ? <BarChart3 /> : <Edit3 />}
+                                        <span>{activeView === 'actions' ? 'Analytics' : 'Actions'}</span>
+                                    </button>
+                                    <button
+                                        onClick={handleAuditLogClick}
+                                        className={`flex items-center space-x-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                                            activeView === 'auditlog'
+                                                ? 'bg-yellow-100 text-yellow-800'
+                                                : 'bg-gray-50 text-gray-700 hover:bg-yellow-50'
+                                        }`}
+                                        title="Show Audit Log"
+                                    >
+                                        <AuditLogIcon />
+                                        <span>Audit Log</span>
+                                    </button>
+                                    <button
+                                        onClick={exportData}
+                                        className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100"
+                                    >
+                                        <Download />
+                                        <span>Export</span>
+                                    </button>
+                                    <button
+                                        onClick={handleImportClick}
+                                        className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100"
+                                        title="Import"
+                                    >
+                                        <Upload />
+                                        <span>Import</span>
+                                    </button>
+                                    <input
+                                        type="file"
+                                        accept="application/json"
+                                        ref={fileInputRef}
+                                        style={{ display: 'none' }}
+                                        onChange={handleImportFile}
+                                    />
+                                </div>
+                            </div>
+                            {importError && (
+                                <div className={`mt-2 text-sm ${importError.startsWith('Import successful') ? 'text-green-600' : 'text-red-600'}`}>
+                                    {importError}
+                                </div>
+                            )}
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:pr-64">
+                        {activeView === 'actions' ? (
+                            <div className="space-y-6">
+                                {/* ROI Calculation Explanation */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                                    <div className="flex items-start space-x-3">
+                                        <div className="flex-shrink-0 mt-1">
+                                            <BarChart3 />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-medium text-blue-900 mb-1">How ROI is Calculated</h3>
+                                            <p className="text-sm text-blue-800">
+                                                ROI = (Revenue Impact × Strategic Opportunity) ÷ Implementation Effort
+                                            </p>
+                                            <p className="text-xs text-blue-700 mt-1">
+                                                Each user's estimates are combined using geometric mean for consensus. 
+                                                All three dimensions (Revenue, Effort, Strategic) must be estimated for a valid ROI calculation.
+                                            </p>
+                                            <p className="text-xs text-blue-900 mt-2 font-semibold">
+                                                You estimate by picking from options (like $1K, $10K, $100K) — not by entering exact numbers. This uses the Fermi method: order-of-magnitude thinking.
+                                            </p>
+                                            <div className="mt-2 text-xs text-blue-600 flex items-center space-x-1">
+                                                <span>Inspired by</span>
+                                                <a
+                                                    href="https://longform.asmartbear.com/roi-rubric/"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="underline hover:text-blue-900 flex items-center"
+                                                >
+                                                    Jason Cohen's Fermi ROI rubric
+                                                    <svg className="w-3 h-3 ml-1 inline" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                                        <polyline points="15 3 21 3 21 9" />
+                                                        <line x1="10" y1="14" x2="21" y2="3" />
+                                                    </svg>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {(accessMode === 'admin' || accessMode === 'edit') && (
+                                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                                        {!showAddAction ? (
+                                            <button
+                                                onClick={() => {
+                                                    if (isCurrentUserValid) {
+                                                        setShowAddAction(true);
+                                                    }
+                                                }}
+                                                className={`flex items-center space-x-2 w-full p-4 border-2 border-dashed border-gray-300 rounded-lg transition-colors ${
+                                                    isCurrentUserValid
+                                                        ? 'hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+                                                        : 'opacity-50 cursor-not-allowed'
+                                                }`}
+                                                disabled={!isCurrentUserValid}
+                                                title={isCurrentUserValid ? undefined : "Please enter your name to add an action"}
+                                            >
+                                                <Plus />
+                                                <span className="text-gray-600">Add new strategic action</span>
+                                            </button>
+                                        ) : (
+                                            <AddActionForm 
+                                                categories={categories}
+                                                onAdd={addAction}
+                                                onCancel={() => setShowAddAction(false)}
+                                            />
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="space-y-4">
+                                    {sortedActions.map((action, index) => (
+                                        <ActionCard
+                                            key={action.id}
+                                            action={action}
+                                            index={index}
+                                            categories={categories}
+                                            dimensions={dimensions}
+                                            onAddEstimate={addEstimate}
+                                            onUpdateAction={updateAction}
+                                            calculateROI={calculateROI}
+                                            accessMode={accessMode}
+                                            currentUser={currentUser}
+                                            isCurrentUserValid={isCurrentUserValid}
+                                        />
+                                    ))}
+                                    
+                                    {actions.length === 0 && (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <Target />
+                                            <p className="mt-4">No actions yet. Add your first strategic action above!</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : activeView === 'analytics' ? (
+                            <AnalyticsView actions={sortedActions} categories={categories} calculateROI={calculateROI} />
+                        ) : (
+                            <AuditLogView
+                                events={eventLogEvents}
+                                actions={actions}
+                                categories={categories}
+                                dimensions={dimensions}
+                            />
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function AddActionForm({ categories, onAdd, onCancel }) {
+            const [title, setTitle] = useState('');
+            const [description, setDescription] = useState('');
+            const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
+
+            const handleSubmit = () => {
+                if (title.trim()) {
+                    onAdd({ title: title.trim(), description: description.trim(), categoryId });
+                    setTitle('');
+                    setDescription('');
+                    setCategoryId(categories[0]?.id || '');
+                }
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                }
+            };
+
+            return (
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Action Title</label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            placeholder="e.g., Implement customer feedback system"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            autoFocus
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                        <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Additional context about this action..."
+                            rows={2}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Strategic Category</label>
+                        <select
+                            value={categoryId}
+                            onChange={(e) => setCategoryId(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            {categories.map(category => (
+                                <option key={category.id} value={category.id}>{category.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                        <button
+                            onClick={handleSubmit}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                        >
+                            Add Action
+                        </button>
+                        <button
+                            onClick={onCancel}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // ActionCard now shows all estimates for each dimension, grouped by user
+        function ActionCard({ action, index, categories, dimensions, onAddEstimate, onUpdateAction, calculateROI, accessMode, currentUser, isCurrentUserValid }) {
+            const [showEstimation, setShowEstimation] = useState(false);
+            const [isEditing, setIsEditing] = useState(false);
+            const [editTitle, setEditTitle] = useState(action.title);
+            const [editDescription, setEditDescription] = useState(action.description || '');
+            const [editCategoryId, setEditCategoryId] = useState(action.categoryId);
+            
+            const category = categories.find(c => c.id === action.categoryId);
+            const roi = calculateROI(action);
+
+            // Attribution: Creator
+            const creator = action.createdBy || "anonymous";
+
+            // Attribution: Contributors to ROI (users who provided revenue or effort estimates)
+            const roiContributorIds = (action.estimates || [])
+                .filter(e => e.dimensionId === "revenue" || e.dimensionId === "effort")
+                .map(e => e.contributorId || "anonymous");
+            // Unique contributors, sorted alphabetically for consistency
+            const uniqueContributors = Array.from(new Set(roiContributorIds)).sort();
+
+            // For each dimension, show all user estimates
+            const getEstimatesForDimension = (dimensionId) => {
+                return (action.estimates || []).filter(e => e.dimensionId === dimensionId);
+            };
+
+            // Only allow editing estimates if current user is valid
+            const canEdit = (accessMode === 'admin' || accessMode === 'edit') && isCurrentUserValid;
+
+            // For the grid, use 3 columns if 3 dimensions, else 2
+            const gridCols = dimensions.length === 3 ? "grid-cols-3" : "grid-cols-2";
+
+            // Handle edit save
+            const handleSaveEdit = () => {
+                if (editTitle.trim()) {
+                    onUpdateAction(action.id, {
+                        title: editTitle.trim(),
+                        description: editDescription.trim(),
+                        categoryId: editCategoryId
+                    });
+                    setIsEditing(false);
+                }
+            };
+
+            // Handle keyboard events for edit form
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSaveEdit();
+                } else if (e.key === 'Escape') {
+                    handleCancelEdit();
+                }
+            };
+
+            // Handle edit cancel
+            const handleCancelEdit = () => {
+                setEditTitle(action.title);
+                setEditDescription(action.description || '');
+                setEditCategoryId(action.categoryId);
+                setIsEditing(false);
+            };
+
+            // Update edit fields when action changes
+            useEffect(() => {
+                setEditTitle(action.title);
+                setEditDescription(action.description || '');
+                setEditCategoryId(action.categoryId);
+            }, [action]);
+
+            return (
+                <div className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+                    <div className="p-6">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                    <span className="text-sm font-medium text-gray-500">#{index + 1}</span>
+                                    <div 
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: category?.color }}
+                                    />
+                                    <span className="text-sm text-gray-600">{category?.name}</span>
+                                    <div className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full flex items-center space-x-1" title="ROI = (Revenue × Strategic) ÷ Effort">
+                                        <span>ROI: {roi.toFixed(1)}</span>
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                {/* Attribution badges */}
+                                <div className="mb-2 flex flex-wrap items-center gap-1">
+                                    <UserBadge user={creator} label="Creator" />
+                                    {uniqueContributors.length > 0 && (
+                                        <span className="text-xs text-gray-400 ml-1">Contributors:</span>
+                                    )}
+                                    {uniqueContributors.map(user =>
+                                        user !== creator ? (
+                                            <UserBadge key={user} user={user} label={null} />
+                                        ) : null
+                                    )}
+                                </div>
+                                {isEditing ? (
+                                    <div className="space-y-3 mb-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                            <input
+                                                type="text"
+                                                value={editTitle}
+                                                onChange={(e) => setEditTitle(e.target.value)}
+                                                onKeyDown={handleKeyPress}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="Action title"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                                            <textarea
+                                                value={editDescription}
+                                                onChange={(e) => setEditDescription(e.target.value)}
+                                                onKeyDown={handleKeyPress}
+                                                rows={2}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="Additional context about this action..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                            <select
+                                                value={editCategoryId}
+                                                onChange={(e) => setEditCategoryId(e.target.value)}
+                                                onKeyDown={handleKeyPress}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            >
+                                                {categories.map(category => (
+                                                    <option key={category.id} value={category.id}>{category.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{action.title}</h3>
+                                        {action.description && (
+                                            <p className="text-gray-600 mb-4">{action.description}</p>
+                                        )}
+                                    </>
+                                )}
+
+                                <div className={`grid ${gridCols} gap-4 mb-4`}>
+                                    {dimensions.map(dimension => {
+                                        const estimates = getEstimatesForDimension(dimension.id);
+                                        return (
+                                            <div key={dimension.id} className="flex flex-col space-y-1">
+                                                <div className="flex items-center space-x-2">
+                                                    {dimension.id === 'revenue' ? <DollarSign /> : dimension.id === 'effort' ? <Clock /> : <Star />}
+                                                    <div className="text-sm font-medium text-gray-900">{dimension.name}</div>
+                                                </div>
+                                                {estimates.length === 0 ? (
+                                                    <div className="text-sm text-gray-600 ml-6">Not estimated</div>
+                                                ) : (
+                                                    <div className="ml-6 flex flex-col space-y-1">
+                                                        {estimates.map(est => (
+                                                            <div key={est.contributorId + '-' + dimension.id} className="flex items-center space-x-2">
+                                                                <span className="text-xs text-gray-700">
+                                                                    {dimension.scaleValues.find(sv => sv.value === est.estimateValue)?.label || dimension.scaleValues[est.estimateValue]?.label || 'N/A'}
+                                                                </span>
+                                                                <UserBadge user={est.contributorId} label={est.contributorId === creator ? "Creator" : "Estimate"} />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {(accessMode === 'admin' || accessMode === 'edit') && (
+                            <div className="flex space-x-2">
+                                {isEditing ? (
+                                    <>
+                                        <button
+                                            onClick={handleSaveEdit}
+                                            disabled={!editTitle.trim()}
+                                            className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center space-x-1 ${
+                                                editTitle.trim()
+                                                    ? 'bg-green-50 text-green-700 hover:bg-green-100 cursor-pointer'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            }`}
+                                            title={editTitle.trim() ? undefined : "Title is required"}
+                                        >
+                                            <Save />
+                                            <span>Save</span>
+                                        </button>
+                                        <button
+                                            onClick={handleCancelEdit}
+                                            className="px-3 py-2 text-sm bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 flex items-center space-x-1"
+                                        >
+                                            <X />
+                                            <span>Cancel</span>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                if (canEdit) setIsEditing(true);
+                                            }}
+                                            className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center space-x-1 ${
+                                                canEdit
+                                                    ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100 cursor-pointer'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            }`}
+                                            disabled={!canEdit}
+                                            title={canEdit ? undefined : "Please enter your name to edit this action"}
+                                        >
+                                            <Edit3 />
+                                            <span>Edit</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (canEdit) setShowEstimation(!showEstimation);
+                                            }}
+                                            className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                                                canEdit
+                                                    ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            }`}
+                                            disabled={!canEdit}
+                                            title={canEdit ? undefined : "Please enter your name to add or edit estimates"}
+                                        >
+                                            {showEstimation ? 'Hide' : 'Add/Edit'} Estimates
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {showEstimation && canEdit && (
+                        <div className="border-t p-6 bg-gray-50">
+                            <EstimationInterface
+                                action={action}
+                                dimensions={dimensions}
+                                onAddEstimate={onAddEstimate}
+                                currentUser={currentUser}
+                            />
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // EstimationInterface allows each user to provide their own estimates for each dimension.
+        function EstimationInterface({ action, dimensions, onAddEstimate, currentUser }) {
+            const [estimates, setEstimates] = useState({});
+
+            useEffect(() => {
+                const initialEstimates = {};
+                dimensions.forEach(dimension => {
+                    // Find the estimate for this dimension by the current user
+                    const existing = (action.estimates || []).find(
+                        e => e.dimensionId === dimension.id && (e.contributorId || "anonymous") === (currentUser || "anonymous")
+                    );
+                    if (existing) {
+                        initialEstimates[dimension.id] = existing.estimateValue;
+                    }
+                });
+                setEstimates(initialEstimates);
+            }, [action, dimensions, currentUser]);
+
+            const handleEstimateChange = (dimensionId, value) => {
+                setEstimates(prev => ({ ...prev, [dimensionId]: value }));
+                onAddEstimate(action.id, dimensionId, value);
+            };
+
+            return (
+                <div className="space-y-6">
+                    {dimensions.map(dimension => (
+                        <div key={dimension.id}>
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                                {dimension.name}
+                            </label>
+                            <div className="grid grid-cols-5 gap-2">
+                                {dimension.scaleValues.map((scale, index) => (
+                                    <button
+                                        key={scale.value}
+                                        onClick={() => handleEstimateChange(dimension.id, scale.value)}
+                                        className={`p-3 text-center rounded-lg border-2 transition-colors ${
+                                            estimates[dimension.id] === scale.value
+                                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <div className="font-medium text-sm">{scale.label}</div>
+                                        <div className="text-xs text-gray-500 mt-1">{scale.description}</div>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="mt-2 text-xs text-gray-500">
+                                Your estimate: {typeof estimates[dimension.id] !== "undefined"
+                                    ? (dimension.scaleValues.find(sv => sv.value === estimates[dimension.id])?.label || "Not set")
+                                    : "Not set"}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function AnalyticsView({ actions, categories, calculateROI }) {
+            // Helper to get unique contributors for an action's ROI
+            function getROIContributors(action) {
+                const roiContributorIds = (action.estimates || [])
+                    .filter(e => e.dimensionId === "revenue" || e.dimensionId === "effort")
+                    .map(e => e.contributorId || "anonymous");
+                return Array.from(new Set(roiContributorIds)).sort();
+            }
+
+            const categoryStats = categories.map(category => {
+                const categoryActions = actions.filter(a => a.categoryId === category.id);
+                const avgROI = categoryActions.length > 0 
+                    ? categoryActions.reduce((sum, action) => sum + calculateROI(action), 0) / categoryActions.length
+                    : 0;
+                
+                return {
+                    ...category,
+                    count: categoryActions.length,
+                    avgROI
+                };
+            });
+
+            return (
+                <div className="space-y-8">
+                    {/* ROI Calculation Details */}
+                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-4">ROI Calculation Details</h2>
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                            <h3 className="text-lg font-medium text-gray-900 mb-3">Formula</h3>
+                            <div className="text-center mb-4">
+                                <div className="text-2xl font-bold text-blue-600 mb-2">ROI = (Revenue × Strategic) ÷ Effort</div>
+                                <div className="text-sm text-gray-600">Geometric mean of all user estimates</div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <h4 className="font-medium text-gray-900 mb-2">Revenue Impact</h4>
+                                    <p className="text-gray-600">Annual recurring revenue potential</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium text-gray-900 mb-2">Strategic Opportunity</h4>
+                                    <p className="text-gray-600">Strategic alignment and long-term value</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium text-gray-900 mb-2">Implementation Effort</h4>
+                                    <p className="text-gray-600">Time and resources required</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-6">ROI Rankings</h2>
+                        <div className="space-y-3">
+                            {actions.slice(0, 10).map((action, index) => {
+                                const category = categories.find(c => c.id === action.categoryId);
+                                const roi = calculateROI(action);
+                                const creator = action.createdBy || "anonymous";
+                                const contributors = getROIContributors(action);
+
+                                return (
+                                    <div key={action.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                        <div className="flex items-center space-x-4">
+                                            <span className="text-lg font-bold text-gray-500">#{index + 1}</span>
+                                            <div className="flex items-center space-x-2">
+                                                <div 
+                                                    className="w-3 h-3 rounded-full"
+                                                    style={{ backgroundColor: category?.color }}
+                                                />
+                                                <span className="font-medium">{action.title}</span>
+                                            </div>
+                                            {/* Attribution badges */}
+                                            <div className="flex flex-wrap items-center gap-1 ml-2">
+                                                <UserBadge user={creator} label="Creator" />
+                                                {contributors.length > 0 && (
+                                                    <span className="text-xs text-gray-400 ml-1">Contributors:</span>
+                                                )}
+                                                {contributors.map(user =>
+                                                    user !== creator ? (
+                                                        <UserBadge key={user} user={user} label={null} />
+                                                    ) : null
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-lg font-bold text-blue-600 flex items-center justify-end space-x-1" title="ROI = (Revenue × Strategic) ÷ Effort">
+                                                <span>{roi.toFixed(1)}</span>
+                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                                </svg>
+                                            </div>
+                                            <div className="text-sm text-gray-500">ROI Score</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-6">Category Analysis</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {categoryStats.map(category => (
+                                <div key={category.id} className="p-4 border rounded-lg">
+                                    <div className="flex items-center space-x-2 mb-3">
+                                        <div 
+                                            className="w-4 h-4 rounded-full"
+                                            style={{ backgroundColor: category.color }}
+                                        />
+                                        <h3 className="font-medium">{category.name}</h3>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-gray-600">Actions:</span>
+                                            <span className="font-medium">{category.count}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-gray-600">Avg ROI:</span>
+                                            <span className="font-medium">{category.avgROI.toFixed(1)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- New: Audit Log View ---
+        function AuditLogView({ events, actions, categories, dimensions }) {
+            // Helper: get action title by id
+            const getActionTitle = (actionId) => {
+                const action = actions.find(a => a.id === actionId);
+                return action ? action.title : <span className="italic text-gray-400">[deleted or unknown]</span>;
+            };
+            // Helper: get category name by id
+            const getCategoryName = (categoryId) => {
+                const category = categories.find(c => c.id === categoryId);
+                return category ? category.name : <span className="italic text-gray-400">[unknown]</span>;
+            };
+            // Helper: get dimension name by id
+            const getDimensionName = (dimensionId) => {
+                const dimension = dimensions.find(d => d.id === dimensionId);
+                return dimension ? dimension.name : <span className="italic text-gray-400">[unknown]</span>;
+            };
+            // Helper: get scale label by dimensionId and value
+            const getScaleLabel = (dimensionId, value) => {
+                const dimension = dimensions.find(d => d.id === dimensionId);
+                if (!dimension) return value;
+                const scale = dimension.scaleValues.find(sv => sv.value === value) || dimension.scaleValues[value];
+                return scale ? scale.label : value;
+            };
+
+            // Format timestamp
+            const formatTime = (ts) => {
+                if (!ts) return '';
+                const d = new Date(ts);
+                return d.toLocaleString();
+            };
+
+            // Sort events by timestamp ascending
+            const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
+
+            // Visual icon for event type
+            function EventTypeIcon({ type }) {
+                if (type === "ACTION_ADDED") return <Plus />;
+                if (type === "ESTIMATE_ADDED") return <BarChart3 />;
+                if (type === "ACTION_UPDATED") return <Edit3 />;
+                return <AuditLogIcon />;
+            }
+
+            // Who did the event?
+            function getEventUser(event) {
+                if (event.type === "ACTION_ADDED") {
+                    return event.action?.createdBy || "anonymous";
+                }
+                if (event.type === "ACTION_UPDATED") {
+                    return event.action?.updatedBy || event.action?.createdBy || "anonymous";
+                }
+                if (event.type === "ESTIMATE_ADDED") {
+                    return event.estimate?.contributorId || "anonymous";
+                }
+                return "unknown";
+            }
+
+            // Main render
+            return (
+                <div className="space-y-8">
+                    <div className="bg-white rounded-lg shadow-sm border p-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                            <AuditLogIcon />
+                            <span className="ml-2">Audit Log</span>
+                        </h2>
+                        {sortedEvents.length === 0 ? (
+                            <div className="text-gray-500 text-center py-12">
+                                <AuditLogIcon />
+                                <p className="mt-4">No events yet. All edits and actions will appear here.</p>
+                            </div>
+                        ) : (
+                            <ul className="divide-y divide-gray-100">
+                                {sortedEvents.map((event, idx) => (
+                                    <li key={event.id || idx} className="py-4 flex items-start space-x-4">
+                                        <div className="flex-shrink-0 mt-1">
+                                            <EventTypeIcon type={event.type} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center space-x-2">
+                                                <UserBadge user={getEventUser(event)} label={null} />
+                                                <span className="text-xs text-gray-400">{formatTime(event.timestamp)}</span>
+                                            </div>
+                                            <div className="mt-1 text-sm text-gray-700">
+                                                {event.type === "ACTION_ADDED" && (
+                                                    <span>
+                                                        <span className="font-medium text-blue-700">Added action</span>
+                                                        {": "}
+                                                        <span className="font-semibold">{event.action?.title}</span>
+                                                        {event.action?.categoryId && (
+                                                            <span className="ml-2 text-xs text-gray-500">
+                                                                [Category: {getCategoryName(event.action.categoryId)}]
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                )}
+                                                {event.type === "ACTION_UPDATED" && (
+                                                    <span>
+                                                        <span className="font-medium text-yellow-700">Updated action</span>
+                                                        {": "}
+                                                        <span className="font-semibold">{event.action?.title || getActionTitle(event.action?.id)}</span>
+                                                    </span>
+                                                )}
+                                                {event.type === "ESTIMATE_ADDED" && (
+                                                    <span>
+                                                        <span className="font-medium text-green-700">Estimated</span>
+                                                        {": "}
+                                                        <span className="font-semibold">{getActionTitle(event.actionId)}</span>
+                                                        {event.estimate?.dimensionId && (
+                                                            <span>
+                                                                {" "}
+                                                                <span className="text-xs text-gray-500">
+                                                                    [{getDimensionName(event.estimate.dimensionId)}]
+                                                                </span>
+                                                                {typeof event.estimate.estimateValue !== "undefined" && (
+                                                                    <span className="ml-2 text-xs text-blue-700">
+                                                                        {getScaleLabel(event.estimate.dimensionId, event.estimate.estimateValue)}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                )}
+                                                {/* Fallback for unknown event types */}
+                                                {event.type !== "ACTION_ADDED" && event.type !== "ACTION_UPDATED" && event.type !== "ESTIMATE_ADDED" && (
+                                                    <span>
+                                                        <span className="font-medium text-gray-700">{event.type}</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<FermiROIApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
